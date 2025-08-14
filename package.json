@@ -1,6 +1,6 @@
 {
   "name": "@build000r/mcp-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "MCP configuration manager for Claude - scan, view, and manage MCP server configurations across all projects",
   "main": "index.js",
   "bin": {
