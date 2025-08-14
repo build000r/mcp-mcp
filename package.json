@@ -1,0 +1,24 @@
+{
+  "name": "mcp-mcp",
+  "version": "1.0.0",
+  "description": "MCP configuration manager for Claude - scan, view, and manage MCP server configurations across all projects",
+  "main": "index.js",
+  "bin": {
+    "mcp-mcp": "./index.js"
+  },
+  "scripts": {
+    "test": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "configuration",
+    "manager",
+    "model-context-protocol"
+  ],
+  "author": "MCP-MCP",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
