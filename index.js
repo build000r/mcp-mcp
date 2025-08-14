@@ -43,10 +43,50 @@ class MCPManager {
 
   findClaudeConfigs(startDir = process.cwd()) {
     const configs = [];
-    let currentDir = startDir;
+    
+    // Always check home directory first for the main Claude config
+    const homeConfigPath = path.join(os.homedir(), '.claude.json');
+    if (fs.existsSync(homeConfigPath)) {
+      try {
+        const content = fs.readFileSync(homeConfigPath, 'utf8');
+        const config = JSON.parse(content);
+        
+        // Add global MCP servers
+        if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+          configs.push({
+            path: os.homedir(),
+            configPath: homeConfigPath,
+            config: { mcpServers: config.mcpServers },
+            scope: 'user'
+          });
+        }
+        
+        // Add all project-specific configs
+        if (config.projects) {
+          Object.keys(config.projects).forEach(projectPath => {
+            const projectConfig = config.projects[projectPath];
+            if (projectConfig.mcpServers && Object.keys(projectConfig.mcpServers).length > 0) {
+              // Check if path exists or if it's a reasonable project path
+              if (fs.existsSync(projectPath) || projectPath.includes('/')) {
+                configs.push({
+                  path: projectPath,
+                  configPath: homeConfigPath,
+                  config: { mcpServers: projectConfig.mcpServers },
+                  scope: 'workspace'
+                });
+              }
+            }
+          });
+        }
+        
+      } catch (error) {
+        console.error(`Error reading user config: ${error.message}`);
+      }
+    }
 
-    // Traverse up from current directory
-    while (currentDir !== path.dirname(currentDir)) {
+    // Also check for standalone .claude.json files in current directory and up
+    let currentDir = startDir;
+    while (currentDir !== path.dirname(currentDir) && currentDir !== os.homedir()) {
       const configPath = path.join(currentDir, '.claude.json');
       
       if (fs.existsSync(configPath)) {
@@ -54,23 +94,13 @@ class MCPManager {
           const content = fs.readFileSync(configPath, 'utf8');
           const config = JSON.parse(content);
           
-          // Check for project-specific MCP servers
-          if (config.projects && config.projects[currentDir] && config.projects[currentDir].mcpServers) {
-            configs.push({
-              path: currentDir,
-              configPath,
-              config: { mcpServers: config.projects[currentDir].mcpServers },
-              scope: 'workspace'
-            });
-          }
-          
-          // Check for global MCP servers (only add once from home directory)
-          if (currentDir === os.homedir() && config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+          // Check for direct MCP servers in standalone config
+          if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
             configs.push({
               path: currentDir,
               configPath,
               config: { mcpServers: config.mcpServers },
-              scope: 'user'
+              scope: 'workspace'
             });
           }
           
@@ -82,48 +112,9 @@ class MCPManager {
       currentDir = path.dirname(currentDir);
     }
 
-    // Check home directory if we haven't already
-    if (startDir !== os.homedir()) {
-      const homeConfigPath = path.join(os.homedir(), '.claude.json');
-      if (fs.existsSync(homeConfigPath)) {
-        try {
-          const content = fs.readFileSync(homeConfigPath, 'utf8');
-          const config = JSON.parse(content);
-          
-          // Add global MCP servers
-          if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-            configs.push({
-              path: os.homedir(),
-              configPath: homeConfigPath,
-              config: { mcpServers: config.mcpServers },
-              scope: 'user'
-            });
-          }
-          
-          // Add any project-specific configs for paths that exist
-          if (config.projects) {
-            Object.keys(config.projects).forEach(projectPath => {
-              const projectConfig = config.projects[projectPath];
-              if (projectConfig.mcpServers && Object.keys(projectConfig.mcpServers).length > 0 && fs.existsSync(projectPath)) {
-                configs.push({
-                  path: projectPath,
-                  configPath: homeConfigPath,
-                  config: { mcpServers: projectConfig.mcpServers },
-                  scope: 'workspace'
-                });
-              }
-            });
-          }
-          
-        } catch (error) {
-          console.error(`Error reading user config: ${error.message}`);
-        }
-      }
-    }
-
-    // Remove duplicates and sort by path length
+    // Remove duplicates and sort by path length (shortest first = highest in hierarchy)
     const uniqueConfigs = configs.filter((config, index, self) => 
-      index === self.findIndex(c => c.path === config.path && JSON.stringify(c.config) === JSON.stringify(config.config))
+      index === self.findIndex(c => c.path === config.path)
     );
     
     return uniqueConfigs.sort((a, b) => a.path.length - b.path.length);
